@@ -8,8 +8,8 @@ module.exports = class Deps{
 
   /**
    * turns true if the given file objected and related stats object represent a situation where the file should be ignored.
-   * @param {object} file 
-   * @param {object} stats 
+   * @param {object} file
+   * @param {object} stats
    * @returns {boolean} true if file should be ignored.
    */
   static ignore(file,stats){
@@ -42,47 +42,65 @@ module.exports = class Deps{
       packages.push({ path: file, package: require(file)  }  )
     }
 
+    let lastSort = []
+    let newSort = packages.slice(0)
+    let lastSortId = ""
+    let newSortId = ""
+    do{
+      lastSort = newSort.slice(0)
 
-    //apply dep analysis to sort list.
+      //apply dep analysis to sort list.
+      newSort.sort( function(a, b){
 
-    packages.sort( function(a, b){
+        let isBinADeps = _.find(a.package.dependencies, function(val,key){
+          return key === b.package.name
+        })
 
-      let isBinADeps = _.find(a.package.dependencies, function(val,key){
-        return key === b.package.name
+        isBinADeps = isBinADeps || _.find(a.package.devDependencies, function(val, key){
+          return key === b.package.name
+        })
+
+
+        let isAInBDeps = _.find(b.package.dependencies, function(val, key){
+          return key === a.package.name
+        })
+
+        isAInBDeps = isAInBDeps || _.find(b.package.devDependencies, function(val, key){
+          return key === a.package.name
+        })
+
+        if(isAInBDeps && isBinADeps){
+          throw new Error("circular dependency")
+        }
+
+        if(isBinADeps){
+          return 1
+        }
+
+
+        if(isAInBDeps){
+          return -1
+        }
+
+        if(a.package.name > b.package.name){
+          return 1
+        }
+
+        if(a.package.name <= b.package.name){
+          return -1
+        }
+
+        return 0
+
       })
 
-      isBinADeps = isBinADeps || _.find(a.package.devDependencies, function(val, key){
-        return key === b.package.name
-      })
+      lastSortId = JSON.stringify(_.map(lastSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
+      newSortId = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
+
+    } while(newSortId != lastSortId);
 
 
-      let isAInBDeps = _.find(b.package.dependencies, function(val, key){
-        return key === a.package.name
-      })
-
-      isAInBDeps = isAInBDeps || _.find(b.package.devDependencies, function(val, key){
-        return key === a.package.name
-      })
-
-      if(isAInBDeps && isBinADeps){
-        throw new Error("circular dependency")
-      }
-
-      if(isBinADeps){
-        return 1
-      }
-
-
-      if(isAInBDeps){
-        return -1
-      }
-
-      return 0
-
-    })
-
-
-    return packages
+    return newSort
   }
 
 }
