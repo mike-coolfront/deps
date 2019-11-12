@@ -47,15 +47,15 @@ module.exports = class Deps{
     let lastSortId = ""
     let newSortId = ""
 
-    let start = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
-    console.log(start)
+    // let start = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
+    // console.log(start)
 
       // do{
       lastSort = newSort.slice(0)
 
       //apply dep analysis to sort list.
       newSort.sort( function(a, b){
-        console.log("a: "+ a.package.name+ " b: "+ b.package.name)
+        // console.log("a: "+ a.package.name+ " b: "+ b.package.name)
         let isBinADeps = _.find(a.package.dependencies, function(val,key){
           return key === b.package.name
         })
@@ -73,30 +73,30 @@ module.exports = class Deps{
           return key === a.package.name
         })
 
-        console.log("AinB: "+ isAInBDeps + " BinA: "+isBinADeps)
+        // console.log("AinB: "+ isAInBDeps + " BinA: "+isBinADeps)
         if(isAInBDeps && isBinADeps){
           throw new Error("circular dependency")
         }
 
         if(isBinADeps){
-          console.log("return 1")
+          // console.log("return 1")
           return 1
         }
 
 
         if(isAInBDeps){
-          console.log("return -1")
+          // console.log("return -1")
           return -1
         }
 
-        console.log("return 1")
+        // console.log("return 1")
         return 1
 
       })
 
       lastSortId = JSON.stringify(_.map(lastSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
       newSortId = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
-      console.log("last: "+ lastSortId + " new: "+ newSortId)
+      // console.log("last: "+ lastSortId + " new: "+ newSortId)
     // }
     // while(newSortId != lastSortId);
 
