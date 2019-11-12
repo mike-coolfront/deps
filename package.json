@@ -27,6 +27,7 @@
     "chai": "4.2.0",
     "lodash": "4.17.15",
     "mocha": "6.2.2",
-    "recursive-readdir": "2.2.2"
+    "recursive-readdir": "2.2.2",
+    "sinon": "^7.5.0"
   }
 }

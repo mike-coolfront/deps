@@ -42,66 +42,37 @@ module.exports = class Deps{
       packages.push({ path: file, package: require(file)  }  )
     }
 
+    Deps.rank(packages)
+    packages = Deps.organize(packages)
+
     let lastSort = []
     let newSort = packages.slice(0)
     let lastSortId = ""
     let newSortId = ""
 
-    // let start = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
-    // console.log(start)
+    let start = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
+    Deps.log(start)
 
       // do{
       lastSort = newSort.slice(0)
 
       //apply dep analysis to sort list.
-      newSort.sort( function(a, b){
-        // console.log("a: "+ a.package.name+ " b: "+ b.package.name)
-        let isBinADeps = _.find(a.package.dependencies, function(val,key){
-          return key === b.package.name
-        })
-
-        isBinADeps = isBinADeps || _.find(a.package.devDependencies, function(val, key){
-          return key === b.package.name
-        })
-
-
-        let isAInBDeps = _.find(b.package.dependencies, function(val, key){
-          return key === a.package.name
-        })
-
-        isAInBDeps = isAInBDeps || _.find(b.package.devDependencies, function(val, key){
-          return key === a.package.name
-        })
-
-        // console.log("AinB: "+ isAInBDeps + " BinA: "+isBinADeps)
-        if(isAInBDeps && isBinADeps){
-          throw new Error("circular dependency")
-        }
-
-        if(isBinADeps){
-          // console.log("return 1")
-          return 1
-        }
-
-
-        if(isAInBDeps){
-          // console.log("return -1")
-          return -1
-        }
-
-        // console.log("return 1")
-        return 1
-
-      })
-
+      newSort = Deps.sort(newSort)
       lastSortId = JSON.stringify(_.map(lastSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
-      newSortId = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
-      // console.log("last: "+ lastSortId + " new: "+ newSortId)
-    // }
-    // while(newSortId != lastSortId);
-
+      newSortId = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name+":"+o.rank : ""; }))
+      Deps.log("newSort: "+ newSortId)
 
     return newSort
+  }
+
+  static organize(packages){
+    packages.sort(function(a, b){
+      let astr = a.package.name || ""
+      let bstr = b.package.name || ""
+      return astr.localeCompare(bstr) > 0 ? -1 : 1
+    })
+    return packages
+
   }
 
   /**
@@ -109,75 +80,123 @@ module.exports = class Deps{
    * @param {array} packages
    */
   static sort(packages){
+
+    let newAr = []
     let list = packages.slice(0)
 
-    let noDeps = []
-    let withDeps = []
-    let hasDeps = false
+    //for every item in our list
+    //pop the front for insert into our new list
+    //with item to add, go through new list and determine position to insert.
+    //If list is empty just add
+    //starting from 0 -> end of list
+    //if current new list item is used by our new item then iterate. keeping track of that position. i+1
+    //if current new list item is a user of our new item then insert before the new list item.
+    //if current new list item is neither then
+    // if we are not at the end of the new list then continue on to the next new list item.
+    // if we are at the end of the list
+    //   if we are used by a new list item.. then insert in the tracked position.
+    //   else
+    //   add to the end if we our rank the current new list item.
+    //   or add ot the front if we do not out rank.
 
-    //pull out deps
-    while(list.length){
-      //for each package starting with the 1st. move it past its deps.
-      let a = list.shift()
 
-      let hasDep = false;
+    for(let a = 0; a < list.length; a++){
+      let aitem = list[a]
+      if(newAr.length === 0) {
+        newAr.push(aitem)
+        continue;
+      }
+      let insertAt =0
+      Deps.log(JSON.stringify(_.map(newAr, function(o){ return (o && o.package) ? o.package.name+":"+o.rank : ""; })))
 
-      for(let p = 0; p < list.length;p++){
-        let pack = list[p]
+      for(let i = 0; i < newAr.length; i++){
+        let newArItem = newAr[i]
+        let doIUseYou = Deps.doesAUseB(aitem, newArItem)
+        let doYouUseMe = Deps.doesAUseB(newArItem, aitem)
+        if(doIUseYou && doYouUseMe){
+          throw new Error("circular dependency")
+        }
 
-        let deps = _.extend({}, a.package.dependencies, a.package.devDependencies)
-        let doesAHaveDeps = _.find(deps, function(val,key){
-          return key === pack.package.name
-        })
+        if(doIUseYou){
+          if(i === newAr.length -1){
+            newAr.push(aitem)
+            break;
+          } else{
+            insertAt = i+1
+            continue
+          }
 
-        if(doesAHaveDeps){
-          hasDep = true;
-          break;
+        } else{
+          if(doYouUseMe){
+            let endChunk = newAr.splice(i)
+            newAr.push(aitem)
+            newAr = newAr.concat(endChunk)
+            break;
+          } else{
+
+            if(i === newAr.length-1){
+              if(insertAt > 0){
+                //we use someone.. insert after them
+                let endChunk = newAr.splice(insertAt)
+                newAr.push(aitem)
+                newAr = newAr.concat(endChunk)
+                break;
+
+              }
+              else{
+                //if we get here it just means no one in the current list uses us.
+                //but a future add could.
+                //In this case use our cross dep count "rank" to determine if we go to the end of the list(high order deps)
+                //or the end (lower order deps)
+                //Note that the resulting list will not be ordered by rank. you can see a lower rank ahead of another.
+                if(aitem.rank > newArItem.rank){
+                  newAr.push(aitem)
+                }
+                else{
+                  newAr.unshift(aitem)
+                }
+                break;
+              }
+            }
+
+            //at this point we'll just continue.
+            //this should allow the current insertAt to be retain and for the
+            //item to add "aitem" to be checked against the next item in the new list.
+
+            continue;
+          }
+        }
+
+      }
+    }
+    return newAr
+  }
+
+  static doesAUseB(a,b){
+    let deps = _.extend({}, a.package.dependencies, a.package.devDependencies)
+     return !!_.find(deps, function(val,key){
+      return key === b.package.name
+    })
+  }
+
+  static rank(packages){
+    for(let a = 0; a < packages.length; a++){
+      let packToRank = packages[a]
+      packToRank.rank = 0
+      for(let b = 0; b < packages.length; b++){
+        let packB = packages[b]
+        if(Deps.doesAUseB(packToRank,packB)){
+          packToRank.rank++
         }
       }
-
-      if(!hasDep){
-        noDeps.push(a)
-      } else{
-        withDeps.push(a)
-      }
-
     }
-
-
   }
 
-  /**
-   *
-   * @param {{path:string, package:{dependencies: array, devDependencies: array, name:string}}} a
-   * @param {{path:string, package:{dependencies: array, devDependencies: array, name:string}}} b
-   */
-  static compare(a,b){
-
-    let isBinADeps = _.find(a.package.dependencies, function(val,key){
-      return key === b.package.name
-    })
-
-    isBinADeps = isBinADeps || _.find(a.package.devDependencies, function(val, key){
-      return key === b.package.name
-    })
-
-
-    let isAInBDeps = _.find(b.package.dependencies, function(val, key){
-      return key === a.package.name
-    })
-
-    isAInBDeps = isAInBDeps || _.find(b.package.devDependencies, function(val, key){
-      return key === a.package.name
-    })
-
-    if(isAInBDeps && isBinADeps) throw new Error("circular dependency")
-    if(isAInBDeps) return -1
-    if(isBinADeps) return 1
-
-    return 0
-
-
+  static log(msg){
+    if(process.env.DEBUG && process.env.DEBUG.toLowerCase() === 'true'){
+      Deps.log(msg)
+    }
   }
+
 
 }
