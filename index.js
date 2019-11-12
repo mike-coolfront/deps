@@ -194,7 +194,7 @@ module.exports = class Deps{
 
   static log(msg){
     if(process.env.DEBUG && process.env.DEBUG.toLowerCase() === 'true'){
-      Deps.log(msg)
+      console.log(msg)
     }
   }
 
