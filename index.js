@@ -46,12 +46,16 @@ module.exports = class Deps{
     let newSort = packages.slice(0)
     let lastSortId = ""
     let newSortId = ""
-    do{
+
+    let start = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
+    console.log(start)
+
+      // do{
       lastSort = newSort.slice(0)
 
       //apply dep analysis to sort list.
       newSort.sort( function(a, b){
-
+        console.log("a: "+ a.package.name+ " b: "+ b.package.name)
         let isBinADeps = _.find(a.package.dependencies, function(val,key){
           return key === b.package.name
         })
@@ -69,38 +73,111 @@ module.exports = class Deps{
           return key === a.package.name
         })
 
+        console.log("AinB: "+ isAInBDeps + " BinA: "+isBinADeps)
         if(isAInBDeps && isBinADeps){
           throw new Error("circular dependency")
         }
 
         if(isBinADeps){
+          console.log("return 1")
           return 1
         }
 
 
         if(isAInBDeps){
+          console.log("return -1")
           return -1
         }
 
-        if(a.package.name > b.package.name){
-          return 1
-        }
-
-        if(a.package.name <= b.package.name){
-          return -1
-        }
-
-        return 0
+        console.log("return 1")
+        return 1
 
       })
 
       lastSortId = JSON.stringify(_.map(lastSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
       newSortId = JSON.stringify(_.map(newSort, function(o){ return (o && o.package) ? o.package.name : ""; }))
-
-    } while(newSortId != lastSortId);
+      console.log("last: "+ lastSortId + " new: "+ newSortId)
+    // }
+    // while(newSortId != lastSortId);
 
 
     return newSort
+  }
+
+  /**
+   *
+   * @param {array} packages
+   */
+  static sort(packages){
+    let list = packages.slice(0)
+
+    let noDeps = []
+    let withDeps = []
+    let hasDeps = false
+
+    //pull out deps
+    while(list.length){
+      //for each package starting with the 1st. move it past its deps.
+      let a = list.shift()
+
+      let hasDep = false;
+
+      for(let p = 0; p < list.length;p++){
+        let pack = list[p]
+
+        let deps = _.extend({}, a.package.dependencies, a.package.devDependencies)
+        let doesAHaveDeps = _.find(deps, function(val,key){
+          return key === pack.package.name
+        })
+
+        if(doesAHaveDeps){
+          hasDep = true;
+          break;
+        }
+      }
+
+      if(!hasDep){
+        noDeps.push(a)
+      } else{
+        withDeps.push(a)
+      }
+
+    }
+
+
+  }
+
+  /**
+   *
+   * @param {{path:string, package:{dependencies: array, devDependencies: array, name:string}}} a
+   * @param {{path:string, package:{dependencies: array, devDependencies: array, name:string}}} b
+   */
+  static compare(a,b){
+
+    let isBinADeps = _.find(a.package.dependencies, function(val,key){
+      return key === b.package.name
+    })
+
+    isBinADeps = isBinADeps || _.find(a.package.devDependencies, function(val, key){
+      return key === b.package.name
+    })
+
+
+    let isAInBDeps = _.find(b.package.dependencies, function(val, key){
+      return key === a.package.name
+    })
+
+    isAInBDeps = isAInBDeps || _.find(b.package.devDependencies, function(val, key){
+      return key === a.package.name
+    })
+
+    if(isAInBDeps && isBinADeps) throw new Error("circular dependency")
+    if(isAInBDeps) return -1
+    if(isBinADeps) return 1
+
+    return 0
+
+
   }
 
 }
