@@ -1,6 +1,6 @@
 {
   "name": "@coolfront-npm/monodeps",
-  "version": "1.0.6-psi2",
+  "version": "1.0.6-psi3",
   "description": "simple tool to return list of cross dependant packages in a monorepo",
   "main": "index.js",
   "keywords": [
